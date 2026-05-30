@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GYM TIMER" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>GYM TIMER</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --accent: #c8ff00;
+      --accent-dim: #8aad00;
+      --red: #ff3b30;
+      --text: #f0f0f0;
+      --muted: #444;
+      --border: #222;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: env(safe-area-inset-top, 20px) 24px env(safe-area-inset-bottom, 20px);
+      min-height: 100dvh;
+      position: relative;
+    }
+
+    /* Background grain */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Top label */
+    .label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.4em;
+      color: var(--muted);
+      text-transform: uppercase;
+      z-index: 1;
+      margin-top: 8px;
+    }
+
+    /* Center block */
+    .center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      z-index: 1;
+      flex: 1;
+      justify-content: center;
+    }
+
+    /* Status pill */
+    .status-pill {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      padding: 4px 14px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      margin-bottom: 24px;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+    }
+    .status-pill.running {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 12px rgba(200, 255, 0, 0.2);
+    }
+    .status-pill.done {
+      border-color: var(--red);
+      color: var(--red);
+      box-shadow: 0 0 12px rgba(255, 59, 48, 0.25);
+    }
+
+    /* Timer display */
+    .timer-wrap {
+      position: relative;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .timer {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(100px, 28vw, 140px);
+      line-height: 1;
+      color: var(--text);
+      letter-spacing: -2px;
+      transition: color 0.4s ease;
+    }
+
+    .timer.done {
+      color: var(--red);
+    }
+
+    .timer-sep {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(80px, 22vw, 110px);
+      line-height: 1;
+      color: var(--muted);
+      animation: blink 1s step-end infinite;
+    }
+    .timer-sep.running { animation: blink 1s step-end infinite; }
+    .timer-sep.paused { opacity: 0.3; animation: none; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.15; }
+    }
+
+    /* Progress bar */
+    .progress-track {
+      width: 100%;
+      max-width: 300px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 100px;
+      margin-top: 28px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 100px;
+      width: 0%;
+      transition: width 0.5s linear, background 0.4s ease;
+    }
+    .progress-fill.done { background: var(--red); }
+
+    /* Target label */
+    .target-label {
+      margin-top: 12px;
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* Buttons */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 320px;
+      z-index: 1;
+      padding-bottom: 8px;
+    }
+
+    .btn-main {
+      width: 100%;
+      height: 64px;
+      border-radius: 16px;
+      border: none;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 0.25em;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+
+    .btn-main:active { transform: scale(0.97); }
+
+    .btn-start {
+      background: var(--accent);
+      color: #0a0a0a;
+    }
+    .btn-start:hover { background: #d9ff26; }
+
+    .btn-pause {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-reset {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      font-size: 16px;
+    }
+    .btn-reset:hover { color: var(--text); border-color: #444; }
+
+    /* Set counter */
+    .set-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 320px;
+      z-index: 1;
+      margin-bottom: 4px;
+    }
+    .set-label {
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .set-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.3s ease;
+    }
+    .dot.active { background: var(--accent); }
+
+    /* Flash overlay on completion */
+    .flash {
+      position: fixed;
+      inset: 0;
+      background: var(--accent);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 99;
+      transition: opacity 0.1s;
+    }
+    .flash.go { animation: flashAnim 0.6s ease forwards; }
+    @keyframes flashAnim {
+      0% { opacity: 0.25; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="flash" id="flash"></div>
+
+  <div class="label">GYM TIMER</div>
+
+  <div class="center">
+    <div class="status-pill" id="statusPill">LISTO</div>
+
+    <div class="timer-wrap">
+      <div class="timer" id="timerMin">00</div>
+      <div class="timer-sep paused" id="sep">:</div>
+      <div class="timer" id="timerSec">00</div>
+    </div>
+
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="target-label">META: 3:00</div>
+  </div>
+
+  <div class="set-row">
+    <div class="set-label">SERIES</div>
+    <div class="set-dots" id="setDots">
+      <div class="dot" data-i="0"></div>
+      <div class="dot" data-i="1"></div>
+      <div class="dot" data-i="2"></div>
+      <div class="dot" data-i="3"></div>
+      <div class="dot" data-i="4"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-main btn-start" id="btnMain" onclick="handleMain()">EMPIEZA</button>
+    <button class="btn-main btn-reset" id="btnReset" onclick="handleReset()">REINICIAR</button>
+  </div>
+
+  <script>
+    const TARGET = 180; // 3 minutos en segundos
+    let elapsed = 0;
+    let interval = null;
+    let running = false;
+    let finished = false;
+    let sets = 0;
+
+    const timerMin = document.getElementById('timerMin');
+    const timerSec = document.getElementById('timerSec');
+    const sep = document.getElementById('sep');
+    const statusPill = document.getElementById('statusPill');
+    const progressFill = document.getElementById('progressFill');
+    const btnMain = document.getElementById('btnMain');
+    const flash = document.getElementById('flash');
+    const dots = document.querySelectorAll('.dot');
+
+    // Audio context para el beep
+    let audioCtx = null;
+
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playBeep(type = 'done') {
+      const ctx = getAudio();
+      if (type === 'done') {
+        // 3 beeps cortos y un largo — como un timer profesional
+        const beeps = [0, 0.25, 0.5, 0.8];
+        const durations = [0.12, 0.12, 0.12, 0.5];
+        beeps.forEach((delay, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = i === 3 ? 880 : 660;
+          osc.type = 'sine';
+          const start = ctx.currentTime + delay;
+          gain.gain.setValueAtTime(0, start);
+          gain.gain.linearRampToValueAtTime(0.6, start + 0.01);
+          gain.gain.linearRampToValueAtTime(0, start + durations[i]);
+          osc.start(start);
+          osc.stop(start + durations[i] + 0.05);
+        });
+      } else if (type === 'start') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 440;
+        osc.type = 'sine';
+        const start = ctx.currentTime;
+        gain.gain.setValueAtTime(0.3, start);
+        gain.gain.linearRampToValueAtTime(0, start + 0.1);
+        osc.start(start);
+        osc.stop(start + 0.15);
+      }
+    }
+
+    function updateDisplay() {
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      timerMin.textContent = String(m).padStart(2, '0');
+      timerSec.textContent = String(s).padStart(2, '0');
+
+      const pct = Math.min((elapsed / TARGET) * 100, 100);
+      progressFill.style.width = pct + '%';
+    }
+
+    function tick() {
+      elapsed++;
+      updateDisplay();
+
+      if (elapsed >= TARGET && !finished) {
+        finished = true;
+        clearInterval(interval);
+        running = false;
+        onFinish();
+      }
+    }
+
+    function onFinish() {
+      statusPill.textContent = '¡DESCANSA!';
+      statusPill.className = 'status-pill done';
+      timerMin.classList.add('done');
+      timerSec.classList.add('done');
+      progressFill.classList.add('done');
+      sep.classList.remove('running');
+      sep.classList.add('paused');
+      btnMain.textContent = 'OTRA SERIE';
+      btnMain.className = 'btn-main btn-start';
+
+      // Flash visual
+      flash.classList.add('go');
+      setTimeout(() => flash.classList.remove('go'), 700);
+
+      // Sonido
+      playBeep('done');
+
+      // Actualizar sets
+      sets = Math.min(sets + 1, 5);
+      dots.forEach((d, i) => {
+        d.classList.toggle('active', i < sets);
+      });
+    }
+
+    function handleMain() {
+      getAudio(); // desbloquear audio en iOS en primer toque
+
+      if (finished) {
+        // Nueva serie: resetear y arrancar
+        handleReset(true);
+        return;
+      }
+
+      if (!running) {
+        // Arrancar
+        running = true;
+        finished = false;
+        interval = setInterval(tick, 1000);
+        statusPill.textContent = 'CORRIENDO';
+        statusPill.className = 'status-pill running';
+        sep.className = 'timer-sep running';
+        btnMain.textContent = 'PAUSA';
+        btnMain.className = 'btn-main btn-pause';
+        playBeep('start');
+      } else {
+        // Pausar
+        running = false;
+        clearInterval(interval);
+        statusPill.textContent = 'PAUSA';
+        statusPill.className = 'status-pill';
+        sep.className = 'timer-sep paused';
+        btnMain.textContent = 'CONTINUAR';
+        btnMain.className = 'btn-main btn-start';
+      }
+    }
+
+    function handleReset(autoStart = false) {
+      clearInterval(interval);
+      running = false;
+      finished = false;
+      elapsed = 0;
+      updateDisplay();
+      statusPill.textContent = autoStart ? 'CORRIENDO' : 'LISTO';
+      statusPill.className = autoStart ? 'status-pill running' : 'status-pill';
+      timerMin.classList.remove('done');
+      timerSec.classList.remove('done');
+      progressFill.classList.remove('done');
+      progressFill.style.width = '0%';
+      sep.className = autoStart ? 'timer-sep running' : 'timer-sep paused';
+      btnMain.textContent = autoStart ? 'PAUSA' : 'EMPIEZA';
+      btnMain.className = autoStart ? 'btn-main btn-pause' : 'btn-main btn-start';
+
+      if (autoStart) {
+        running = true;
+        interval = setInterval(tick, 1000);
+        playBeep('start');
+      }
+    }
+
+    // Auto-start si viene desde Siri (?autostart=1)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autostart') === '1') {
+      // Pequeño delay para que cargue el audio context
+      setTimeout(() => handleMain(), 800);
+    }
+
+    // Wake lock para que no se apague la pantalla
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          await navigator.wakeLock.request('screen');
+        }
+      } catch (e) {}
+    }
+    requestWakeLock();
+
+    updateDisplay();
+  </script>
+</body>
+</html>
