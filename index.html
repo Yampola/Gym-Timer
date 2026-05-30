@@ -457,6 +457,9 @@
       }
     }
 
+    // Beep de bienvenida
+    setTimeout(() => playBeep('start'), 400);
+
     // Auto-start si viene desde Siri (?autostart=1)
     const params = new URLSearchParams(window.location.search);
     if (params.get('autostart') === '1') {
@@ -473,7 +476,7 @@
       } catch (e) {}
     }
     requestWakeLock();
-
+    
     updateDisplay();
   </script>
 </body>
